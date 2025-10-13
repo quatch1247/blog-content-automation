@@ -1,1 +1,10 @@
-#ResponseValidationError 핸들러 추가 및 응답 검증 실패 로깅 처리
+import logging
+from app.core.error_codes import ErrorCode
+
+logger = logging.getLogger(__name__)
+
+class APIException(Exception):
+    def __init__(self, error: ErrorCode, details: list = None):
+        self.error = error
+        self.details = details or []
+        logger.warning(f"[{error.code}] {error.message} | details: {self.details}")
