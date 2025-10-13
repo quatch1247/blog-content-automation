@@ -1,3 +1,4 @@
+from typing import List
 from datetime import datetime
 from sqlalchemy.orm import Session
 from app.models.pdf_models import RawPdf, SplitPost, RefinedPost
@@ -49,3 +50,15 @@ def create_refined_post(
     db.commit()
     db.refresh(obj)
     return obj
+
+
+def get_raw_pdf_count(db: Session) -> int:
+    return db.query(RawPdf).count()
+
+
+def get_all_refined_posts(db: Session) -> List[RefinedPost]:
+    return db.query(RefinedPost).order_by(RefinedPost.id.desc()).all()
+
+
+def get_refined_post_count(db: Session) -> int:
+    return db.query(RefinedPost).count()

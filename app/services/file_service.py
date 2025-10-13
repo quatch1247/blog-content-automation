@@ -10,10 +10,10 @@ from app.utils.pdf_utils import convert_pdf_to_html, extract_page_map, detect_po
 from app.utils.pdf_splitter import split_pdf_by_ranges
 from app.utils.pdf_refiner import batch_refine_split_posts
 from app.utils.date_parser_utils import parse_datetime_flexible
-from app.utils.file_cleanup_utils import safe_remove  # 🔥 새로 추가
+from app.utils.file_cleanup_utils import safe_remove
 from app.repositories import pdf_repository
 from app.core.db import get_db_session
-from app.schemas.upload import SplitFileInfo
+from app.schemas.file import SplitFileInfo, RefinedPostInfo
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -26,7 +26,7 @@ os.makedirs(SPLIT_BASE_DIR, exist_ok=True)
 os.makedirs(REFINED_POSTS_DIR, exist_ok=True)
 
 
-class UploadService:
+class FileService:
     @staticmethod
     async def save_and_split_pdf(file: UploadFile) -> dict:
         # 파일 확장자 검증
@@ -142,3 +142,27 @@ class UploadService:
             "refined_results": refined_results,
             "refined_folder": refined_dir,
         }
+
+    def list_files():
+        db = get_db_session()
+        try:
+            raw_pdf_count = pdf_repository.get_raw_pdf_count(db)
+            refined_posts = pdf_repository.get_all_refined_posts(db)
+            refined_post_count = pdf_repository.get_refined_post_count(db)
+            refined_posts_data = [
+                {
+                    "id": post.id,
+                    "title": post.title,
+                    "author": post.author,
+                    "date": post.date,
+                    "url": post.url,
+                }
+                for post in refined_posts
+            ]
+            return {
+                "raw_pdf_count": raw_pdf_count,
+                "refined_post_count": refined_post_count,
+                "refined_posts": refined_posts_data,
+            }
+        finally:
+            db.close()

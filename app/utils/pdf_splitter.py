@@ -1,7 +1,7 @@
 import os
 from typing import List
 from PyPDF2 import PdfReader, PdfWriter
-from app.schemas.upload import SplitFileInfo
+from app.schemas.file import SplitFileInfo
 
 
 def split_pdf_by_ranges(pdf_path: str, output_dir: str, post_ranges: List[tuple[str, int, int]]) -> List[SplitFileInfo]:
