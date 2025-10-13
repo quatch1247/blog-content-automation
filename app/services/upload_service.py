@@ -1,8 +1,8 @@
 import os
 import json
 import logging
-from fastapi import UploadFile
 from typing import List
+from fastapi import UploadFile
 
 from app.core.exceptions import APIException
 from app.core.error_codes import ErrorCode
@@ -10,6 +10,7 @@ from app.utils.pdf_utils import convert_pdf_to_html, extract_page_map, detect_po
 from app.utils.pdf_splitter import split_pdf_by_ranges
 from app.utils.pdf_refiner import batch_refine_split_posts
 from app.utils.date_parser_utils import parse_datetime_flexible
+from app.utils.file_cleanup_utils import safe_remove  # 🔥 새로 추가
 from app.repositories import pdf_repository
 from app.core.db import get_db_session
 from app.schemas.upload import SplitFileInfo
@@ -38,24 +39,32 @@ class UploadService:
 
         db = get_db_session()
         split_dir = None
+        refined_dir = None
 
         try:
+            # PDF 파일 저장
             with open(raw_path, "wb") as f:
                 f.write(await file.read())
+            logger.info(f"[INFO] 원본 PDF 저장 완료: {raw_path}")
 
+            # RawPdf DB 저장
             raw_pdf_obj = pdf_repository.create_raw_pdf(db, filename=file.filename, path=raw_path)
 
+            # 폴더 준비
             base_name = os.path.splitext(file.filename)[0]
             split_dir = os.path.join(SPLIT_BASE_DIR, base_name)
+            refined_dir = os.path.join(REFINED_POSTS_DIR, base_name)
             os.makedirs(split_dir, exist_ok=True)
+            os.makedirs(refined_dir, exist_ok=True)
 
-            # PDF → HTML 변환 및 포스트 범위 탐색
+            # PDF → HTML 변환 및 포스트 구간 탐색
             html_str = convert_pdf_to_html(raw_path)
             page_map = extract_page_map(html_str)
             post_ranges = detect_post_ranges(page_map)
 
-            # PDF 분할 → SplitFileInfo 리스트 반환
+            # PDF 분할
             split_files: List[SplitFileInfo] = split_pdf_by_ranges(raw_path, split_dir, post_ranges)
+            logger.info(f"[INFO] PDF 분할 완료: {len(split_files)}개 파일 생성")
 
             # SplitPost DB 저장
             split_post_objs = []
@@ -69,10 +78,10 @@ class UploadService:
                 )
                 split_post_objs.append(split_post_obj)
 
-            # 정제 처리 (RefinedPost 생성)
+            # 분할된 PDF 후처리 (정제)
             refined_results = batch_refine_split_posts(
                 split_dir=split_dir,
-                output_dir=os.path.join(REFINED_POSTS_DIR, base_name),
+                output_dir=refined_dir,
                 max_workers=2
             )
 
@@ -81,7 +90,6 @@ class UploadService:
                 split_post_obj = split_post_objs[idx]
 
                 parsed_json_path = refined.get("parsed_json_path")
-
                 if isinstance(parsed_json_path, dict):
                     parsed_json_path = parsed_json_path.get("path")
 
@@ -112,10 +120,17 @@ class UploadService:
                 )
 
         except Exception as e:
-            if split_dir and os.path.exists(split_dir) and not os.listdir(split_dir):
-                os.rmdir(split_dir)
             logger.error(f"[ERROR] PDF 처리 중 예외 발생: {e}", exc_info=True)
+            db.rollback()
+
+            safe_remove(raw_path)
+            if split_dir:
+                safe_remove(split_dir)
+            if refined_dir:
+                safe_remove(refined_dir)
+
             raise APIException(ErrorCode.PDF_PROCESSING_FAILED, details=[str(e)])
+
         finally:
             db.close()
 
@@ -123,7 +138,7 @@ class UploadService:
             "success": True,
             "original_pdf": raw_path,
             "split_folder": split_dir,
-            "split_files": split_files,
+            "split_files": [s.model_dump() for s in split_files],
             "refined_results": refined_results,
-            "refined_folder": os.path.join(REFINED_POSTS_DIR, base_name),
+            "refined_folder": refined_dir,
         }
