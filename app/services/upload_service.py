@@ -4,12 +4,14 @@ from app.core.exceptions import APIException
 from app.core.error_codes import ErrorCode
 from app.utils.pdf_utils import convert_pdf_to_html, extract_page_map, detect_post_ranges
 from app.utils.pdf_splitter import split_pdf_by_ranges
+from app.utils.pdf_refiner import batch_refine_split_posts  # <-- 추가!
 
-RAW_UPLOAD_DIR = "uploads/raw"
-SPLIT_BASE_DIR = "uploads/split"
+RAW_UPLOAD_DIR = "uploads/raw_pdf"
+SPLIT_BASE_DIR = "uploads/split_posts"
+REFINED_POSTS_DIR = "uploads/refined_posts"
 os.makedirs(RAW_UPLOAD_DIR, exist_ok=True)
 os.makedirs(SPLIT_BASE_DIR, exist_ok=True)
-
+os.makedirs(REFINED_POSTS_DIR, exist_ok=True)
 
 class UploadService:
     @staticmethod
@@ -45,6 +47,13 @@ class UploadService:
             # 포스트별로 PDF 분리 저장
             split_files = split_pdf_by_ranges(raw_path, split_dir, post_ranges)
 
+            # 🎯 바로 refined_posts 후처리! (split_dir만 처리)
+            refined_results = batch_refine_split_posts(
+                split_dir=split_dir,
+                output_dir=os.path.join(REFINED_POSTS_DIR, base_name),
+                max_workers=2  # 병렬 처리, 코어 수 맞게 조절
+            )
+
         except Exception as e:
             if os.path.exists(split_dir) and not os.listdir(split_dir):
                 os.rmdir(split_dir)
@@ -55,4 +64,6 @@ class UploadService:
             "original_pdf": raw_path,
             "split_folder": split_dir,
             "split_files": split_files,
+            "refined_results": refined_results,
+            "refined_folder": os.path.join(REFINED_POSTS_DIR, base_name),
         }
