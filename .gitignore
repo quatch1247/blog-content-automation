@@ -72,7 +72,7 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# ✅ Keep lock files for reproducible installs
+# Keep lock files for reproducible installs
 !package-lock.json
 !yarn.lock
 !pnpm-lock.yaml
@@ -127,3 +127,6 @@ dmypy.json
 
 # Poetry
 poetry.lock
+
+# Local file storage (uploads)
+uploads/
