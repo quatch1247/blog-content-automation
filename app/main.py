@@ -1,5 +1,3 @@
-# app/main.py
-
 from fastapi import FastAPI
 from app.api.main import api_router
 
@@ -9,5 +7,4 @@ app = FastAPI(
     version="0.1.0"
 )
 
-# 모든 API 라우터 등록 (prefix는 /api로 가정)
 app.include_router(api_router)

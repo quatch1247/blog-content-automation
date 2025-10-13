@@ -1,1 +1,7 @@
-#헬스체크 구현 예정
+from fastapi import APIRouter
+
+router = APIRouter()
+
+@router.get("/health", tags=["Health"])
+def ping(): 
+    return {"status": "ok"}

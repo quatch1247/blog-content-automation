@@ -1,0 +1,12 @@
+services:
+  fastapi:
+    build:
+      context: .
+    image: blog-content-api:dev
+    container_name: blog_content_fastapi
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    working_dir: /app
+    restart: unless-stopped
