@@ -1,18 +1,20 @@
-import io
 import markdown
 from weasyprint import HTML
-from fastapi import HTTPException
 from contextlib import closing
 from app.repositories import pdf_repository
 from app.core.db import get_db_session
+from app.core.exceptions import APIException
+from app.core.error_codes import ErrorCode
+
 
 class SummaryService:
     @staticmethod
     def generate_summary_pdf(post_id: int) -> dict:
         with closing(get_db_session()) as db:
             md_text = pdf_repository.get_summary_markdown_by_post_id(db, post_id)
-            if not md_text:
-                raise HTTPException(status_code=404, detail="요약문이 존재하지 않습니다.")
+        if not md_text:
+            raise APIException(ErrorCode.FILE_NOT_FOUND, details=[f"post_id: {post_id}"])
+
 
         html_body = markdown.markdown(md_text)
         html = f"""
@@ -135,7 +137,7 @@ class SummaryService:
         try:
             pdf_bytes = HTML(string=html).write_pdf()
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"PDF 생성 중 오류 발생: {str(e)}")
+            raise APIException(ErrorCode.FILE_SAVE_FAILED, details=[f"PDF 생성 중 오류: {str(e)}"])
 
         filename = f"summary_{post_id}.pdf"
         return {

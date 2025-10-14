@@ -1,12 +1,14 @@
 from datetime import datetime
 import markdown
 from weasyprint import HTML
-from fastapi import HTTPException
 from contextlib import closing
 
 from app.core.db import get_db_session
 from app.repositories import pdf_repository
 from app.utils.weekly_report_utils import generate_weekly_insight_report_markdown
+from app.core.exceptions import APIException
+from app.core.error_codes import ErrorCode
+
 
 class WeeklyReportService:
     @staticmethod
@@ -14,7 +16,7 @@ class WeeklyReportService:
         with closing(get_db_session()) as db:
             brief_summaries = pdf_repository.get_brief_summaries_by_date_range(db, start_date, end_date)
             if not brief_summaries:
-                raise HTTPException(status_code=404, detail="리포트에 포함할 요약문이 없습니다.")
+                raise APIException(ErrorCode.FILE_NOT_FOUND, details=[f"summary range: {start_date} ~ {end_date}"])
 
         md_text = generate_weekly_insight_report_markdown(
             brief_summaries=brief_summaries,
@@ -161,7 +163,8 @@ class WeeklyReportService:
         try:
             pdf_bytes = HTML(string=html).write_pdf()
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"PDF 생성 중 오류 발생: {str(e)}")
+            raise APIException(ErrorCode.FILE_SAVE_FAILED, details=[f"PDF 생성 오류: {str(e)}"])
+
 
         filename = f"weekly_report_{start_date}_{end_date}.pdf"
         return {

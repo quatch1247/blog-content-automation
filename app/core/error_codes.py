@@ -10,6 +10,9 @@ class ErrorCode(Enum):
     PDF_SPLIT_FAILED = ("E006", "PDF 분할 중 오류가 발생했습니다.", 500)
     PDF_CONVERT_FAILED = ("E007", "PDF 변환 중 오류가 발생했습니다.", 500)
 
+    DB_SAVE_FAILED = ("E008", "DB 저장 중 오류가 발생했습니다.", 500)
+    LLM_API_FAILED = ("E900", "LLM 호출 중 오류가 발생했습니다.", 500)
+
     PARAMETER_VALIDATION_ERROR = ("E100", "요청 파라미터 검증 실패", 422)
     INTERNAL_ERROR = ("E999", "서버 내부 오류", 500)
     UNAUTHORIZED = ("E401", "인증이 필요합니다.", 401)

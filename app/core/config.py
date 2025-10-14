@@ -15,15 +15,14 @@ class Settings(BaseSettings):
     DB_POOL_TIMEOUT: int = 30
     DB_POOL_RECYCLE: int = 1800
 
-    ENVIRONMENT: str = "local" # local | dev | staging | production
+    ENVIRONMENT: str = "local"  # local | dev | staging | production
     PROJECT_NAME: str = "Blog Content Automation"
     cors_origins_raw: str = "*"
     base_dir: str = str(Path(__file__).resolve().parent.parent)
 
-    STABILITY_API_KEY: str #성능 이슈로 사용x
+    # STABILITY_API_KEY: str # 성능 이슈로 사용x
     OPENAI_API_KEY: str
-    
-    GROQ_API_KEY: str
+    # GROQ_API_KEY: str  # 성능 이슈로 사용x
 
     class Config:
         env_file = ".env"
@@ -33,6 +32,9 @@ class Settings(BaseSettings):
     def cors_origins(self) -> List[str]:
         return [origin.strip() for origin in self.cors_origins_raw.split(",") if origin]
 
+    @property
+    def environment(self) -> str:
+        return self.ENVIRONMENT.lower()
 
 @lru_cache()
 def get_settings():

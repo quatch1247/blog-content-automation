@@ -14,7 +14,5 @@ def download_summary_pdf(post_id: int):
             media_type="application/pdf",
             headers={"Content-Disposition": f"attachment; filename={result['filename']}"}
         )
-    except HTTPException:
-        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="알 수 없는 서버 오류입니다.")

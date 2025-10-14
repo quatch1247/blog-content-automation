@@ -50,13 +50,18 @@ class FileService:
         refined_dir = None
 
         try:
-            # PDF 파일 저장
-            with open(raw_path, "wb") as f:
-                f.write(await file.read())
-            logger.info(f"[INFO] 원본 PDF 저장 완료: {raw_path}")
+            try:
+                with open(raw_path, "wb") as f:
+                    f.write(await file.read())
+                logger.info(f"[INFO] 원본 PDF 저장 완료: {raw_path}")
+            except Exception as e:
+                raise APIException(ErrorCode.FILE_SAVE_FAILED, details=[raw_path, str(e)])
 
-            # RawPdf DB 저장
-            raw_pdf_obj = pdf_repository.create_raw_pdf(db, filename=file.filename, path=raw_path)
+            
+            try:
+                raw_pdf_obj = pdf_repository.create_raw_pdf(db, filename=file.filename, path=raw_path)
+            except Exception as e:
+                raise APIException(ErrorCode.DB_SAVE_FAILED, details=["RawPdf", str(e)])
 
             # 폴더 준비
             base_name = os.path.splitext(file.filename)[0]
@@ -66,32 +71,48 @@ class FileService:
             os.makedirs(refined_dir, exist_ok=True)
 
             # PDF → HTML 변환 및 포스트 구간 탐색
-            html_str = convert_pdf_to_html(raw_path)
-            page_map = extract_page_map(html_str)
-            post_ranges = detect_post_ranges(page_map)
+            try:
+                html_str = convert_pdf_to_html(raw_path)
+            except Exception as e:
+                raise APIException(ErrorCode.PDF_CONVERT_FAILED, details=[raw_path, str(e)])
+            
+            try:
+                page_map = extract_page_map(html_str)
+                post_ranges = detect_post_ranges(page_map)
+            except Exception as e:
+                raise APIException(ErrorCode.PDF_SPLIT_FAILED, details=[file.filename, str(e)])
 
             # PDF 분할
-            split_files: List[SplitFileInfo] = split_pdf_by_ranges(raw_path, split_dir, post_ranges)
-            logger.info(f"[INFO] PDF 분할 완료: {len(split_files)}개 파일 생성")
+            try:
+                split_files: List[SplitFileInfo] = split_pdf_by_ranges(raw_path, split_dir, post_ranges)
+                logger.info(f"[INFO] PDF 분할 완료: {len(split_files)}개 파일 생성")
+            except Exception as e:
+                raise APIException(ErrorCode.PDF_SPLIT_FAILED, details=[file.filename, str(e)])
 
             # SplitPost DB 저장
             split_post_objs = []
             for split_info in split_files:
                 split_filename = os.path.basename(split_info.file)
-                split_post_obj = pdf_repository.create_split_post(
-                    db,
-                    raw_pdf_id=raw_pdf_obj.id,
-                    filename=split_filename,
-                    path=split_info.file,
-                )
+                try:
+                    split_post_obj = pdf_repository.create_split_post(
+                        db,
+                        raw_pdf_id=raw_pdf_obj.id,
+                        filename=split_filename,
+                        path=split_info.file,
+                    )
+                except Exception as e:
+                    raise APIException(ErrorCode.DB_SAVE_FAILED, details=["SplitPost", split_filename, str(e)])
                 split_post_objs.append(split_post_obj)
 
             # 분할된 PDF 후처리 (정제함.)
-            refined_results = batch_refine_split_posts(
-                split_dir=split_dir,
-                output_dir=refined_dir,
-                max_workers=2
-            )
+            try:
+                refined_results = batch_refine_split_posts(
+                    split_dir=split_dir,
+                    output_dir=refined_dir,
+                    max_workers=2
+                )
+            except Exception as e:
+                raise APIException(ErrorCode.PDF_PROCESSING_FAILED, details=["Refine", str(e)])
 
             bodies = []
             for refined in refined_results.get("results", []):
@@ -101,27 +122,35 @@ class FileService:
                     bodies.append(meta.get("body", ""))
 
             # 병렬로 markdown summary + brief summary 생성
-            loop = asyncio.get_event_loop()
-            with ThreadPoolExecutor(max_workers=4) as executor:
-                markdown_tasks = [
-                    loop.run_in_executor(executor, generate_markdown_summary, body)
-                    for body in bodies
-                ]
-                brief_tasks = [
-                    loop.run_in_executor(executor, generate_brief_summary, body)
-                    for body in bodies
-                ]
-                summaries, brief_summaries = await asyncio.gather(
-                    asyncio.gather(*markdown_tasks),
-                    asyncio.gather(*brief_tasks),
-                )
+            try:
+                loop = asyncio.get_event_loop()
+                with ThreadPoolExecutor(max_workers=4) as executor:
+                    markdown_tasks = [
+                        loop.run_in_executor(executor, generate_markdown_summary, body)
+                        for body in bodies
+                    ]
+                    brief_tasks = [
+                        loop.run_in_executor(executor, generate_brief_summary, body)
+                        for body in bodies
+                    ]
+                    summaries, brief_summaries = await asyncio.gather(
+                        asyncio.gather(*markdown_tasks),
+                        asyncio.gather(*brief_tasks),
+                    )
+            except Exception as e:
+                raise APIException(ErrorCode.LLM_API_FAILED, details=[str(e)])
                 
             # RefinedPost DB 저장 (두 가지 요약문 함께 저장)
             for idx, refined in enumerate(refined_results.get("results", [])):
                 split_post_obj = split_post_objs[idx]
                 parsed_json_path = refined.get("parsed_json_path")
-                with open(parsed_json_path, "r", encoding="utf-8") as f:
-                    meta = json.load(f)
+                try:
+                    with open(parsed_json_path, "r", encoding="utf-8") as f:
+                        meta = json.load(f)
+                except Exception as e:
+                    logger.warning(f"[WARN] refined json 파싱 실패: {parsed_json_path}, {e}")
+                    meta = {}
+
 
                 parsed_date = None
                 try:
@@ -132,23 +161,26 @@ class FileService:
                 summary = summaries[idx] if summaries and idx < len(summaries) else None
                 brief_summary = brief_summaries[idx] if brief_summaries and idx < len(brief_summaries) else None
 
-                pdf_repository.create_refined_post(
-                    db,
-                    split_post_id=split_post_obj.id,
-                    json_path=parsed_json_path,
-                    images_dir=os.path.join(os.path.dirname(parsed_json_path), "images"),
-                    title=meta.get("title"),
-                    author=meta.get("author"),
-                    date=parsed_date,
-                    url=meta.get("url"),
-                    summary=summary,
-                    brief_summary=brief_summary,
-                )
+                try:
+                    pdf_repository.create_refined_post(
+                        db,
+                        split_post_id=split_post_obj.id,
+                        json_path=parsed_json_path,
+                        images_dir=os.path.join(os.path.dirname(parsed_json_path), "images"),
+                        title=meta.get("title"),
+                        author=meta.get("author"),
+                        date=parsed_date,
+                        url=meta.get("url"),
+                        summary=summary,
+                        brief_summary=brief_summary,
+                    )
+                except Exception as e:
+                    raise APIException(ErrorCode.DB_SAVE_FAILED, details=["RefinedPost", str(e)])
+
 
         except Exception as e:
             logger.error(f"[ERROR] PDF 처리 중 예외 발생: {e}", exc_info=True)
             db.rollback()
-
             safe_remove(raw_path)
             if split_dir:
                 safe_remove(split_dir)
@@ -192,21 +224,29 @@ class FileService:
                 "refined_post_count": refined_post_count,
                 "refined_posts": refined_posts_data,
             }
+        except Exception as e:
+            raise APIException(ErrorCode.INTERNAL_ERROR, details=[str(e)])
         finally:
             db.close()
+
 
 
     @staticmethod
     def truncate_all():
         for dir_path in [RAW_UPLOAD_DIR, SPLIT_BASE_DIR, REFINED_POSTS_DIR]:
-            if os.path.exists(dir_path):
-                shutil.rmtree(dir_path)
-            os.makedirs(dir_path, exist_ok=True)
+            try:
+                if os.path.exists(dir_path):
+                    shutil.rmtree(dir_path)
+                os.makedirs(dir_path, exist_ok=True)
+            except Exception as e:
+                raise APIException(ErrorCode.FILE_SAVE_FAILED, details=[dir_path, str(e)])
 
         db = get_db_session()
         try:
             pdf_repository.truncate_refined_posts(db)
             pdf_repository.truncate_split_posts(db)
             pdf_repository.truncate_raw_pdfs(db)
+        except Exception as e:
+            raise APIException(ErrorCode.DB_SAVE_FAILED, details=["TruncateAll", str(e)])
         finally:
             db.close()

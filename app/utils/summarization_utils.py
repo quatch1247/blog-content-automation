@@ -24,19 +24,21 @@ def generate_markdown_summary(text: str, mode: str = "openai", model: str = None
         )
         return response.choices[0].message.content.strip()
 
-    elif mode == "groq":
-        client = Groq(api_key=settings.GROQ_API_KEY)
-        model = model or "openai/gpt-oss-120b"
-        chat_completion = client.chat.completions.create(
-            messages=[
-                {"role": "system", "content": "너는 한글 요약 전문가야."},
-                {"role": "user", "content": prompt}
-            ],
-            model=model,
-            max_tokens=2048,
-            temperature=0.3,
-        )
-        return chat_completion.choices[0].message.content.strip()
+    # elif mode == "groq":
+    #     # 현재 groq는 사용하지 않으므로 비활성화 (필요시 주석 해제)
+    #     client = Groq(api_key=settings.GROQ_API_KEY)
+    #     model = model or "openai/gpt-oss-120b"
+    #     chat_completion = client.chat.completions.create(
+    #         messages=[
+    #             {"role": "system", "content": "너는 한글 요약 전문가야."},
+    #             {"role": "user", "content": prompt}
+    #         ],
+    #         model=model,
+    #         max_tokens=2048,
+    #         temperature=0.3,
+    #     )
+    #     return chat_completion.choices[0].message.content.strip()
+
     else:
         raise ValueError(f"Unknown mode: {mode}")
 
