@@ -31,3 +31,10 @@ def list_files():
         refined_posts=result["refined_posts"],
         refined_post_count=result["refined_post_count"],
     )
+    
+
+@router.delete("/truncate/all")
+def truncate_all():
+    FileService.truncate_all()
+    return {"success": True, "message": "모든 PDF 파일, 폴더, DB 기록이 초기화되었습니다."}
+

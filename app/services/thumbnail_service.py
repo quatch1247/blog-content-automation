@@ -38,7 +38,7 @@ class ThumbnailService:
                 prompt=prompt,
                 n=1,
                 size="1024x1024",
-                quality="low",
+                quality="high",
                 output_format="png",
             )
 

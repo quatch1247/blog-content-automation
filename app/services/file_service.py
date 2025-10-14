@@ -1,21 +1,22 @@
-import os
 import json
 import logging
-import tempfile
-import zipfile
+import os
+import shutil
 from typing import List
+
 from fastapi import UploadFile
 
-from app.core.exceptions import APIException
+from app.core.db import get_db_session
 from app.core.error_codes import ErrorCode
-from app.utils.pdf_utils import convert_pdf_to_html, extract_page_map, detect_post_ranges
-from app.utils.pdf_splitter import split_pdf_by_ranges
-from app.utils.pdf_refiner import batch_refine_split_posts
+from app.core.exceptions import APIException
+from app.repositories import pdf_repository
+from app.schemas.file import SplitFileInfo
 from app.utils.date_parser_utils import parse_datetime_flexible
 from app.utils.file_cleanup_utils import safe_remove
-from app.repositories import pdf_repository
-from app.core.db import get_db_session
-from app.schemas.file import SplitFileInfo, RefinedPostInfo
+from app.utils.pdf_refiner import batch_refine_split_posts
+from app.utils.pdf_splitter import split_pdf_by_ranges
+from app.utils.pdf_utils import convert_pdf_to_html, extract_page_map, detect_post_ranges
+
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -168,5 +169,21 @@ class FileService:
                 "refined_post_count": refined_post_count,
                 "refined_posts": refined_posts_data,
             }
+        finally:
+            db.close()
+
+
+    @staticmethod
+    def truncate_all():
+        for dir_path in [RAW_UPLOAD_DIR, SPLIT_BASE_DIR, REFINED_POSTS_DIR]:
+            if os.path.exists(dir_path):
+                shutil.rmtree(dir_path)
+            os.makedirs(dir_path, exist_ok=True)
+
+        db = get_db_session()
+        try:
+            pdf_repository.truncate_refined_posts(db)
+            pdf_repository.truncate_split_posts(db)
+            pdf_repository.truncate_raw_pdfs(db)
         finally:
             db.close()
