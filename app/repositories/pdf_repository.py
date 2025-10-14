@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, time
 from typing import List, Optional
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -52,6 +52,7 @@ def create_refined_post(
     db.refresh(obj)
     return obj
 
+
 def get_raw_pdf_count(db: Session) -> int:
     return db.query(RawPdf).count()
 
@@ -96,3 +97,26 @@ def get_summary_markdown_by_post_id(db: Session, post_id: int) -> Optional[str]:
     if not post or not post.summary:
         return None
     return post.summary
+
+
+def get_brief_summaries_by_date_range(
+    db: Session,
+    start_date: datetime,
+    end_date: datetime
+) -> List[Optional[str]]:
+    if isinstance(end_date, datetime):
+        if end_date.time() == time(0, 0, 0):
+            end_date = end_date.replace(hour=23, minute=59, second=59, microsecond=999999)
+    else:
+        end_date = datetime.combine(end_date, time(23, 59, 59, 999999))
+
+    results = (
+        db.query(RefinedPost.brief_summary)
+        .filter(
+            RefinedPost.date >= start_date,
+            RefinedPost.date <= end_date
+        )
+        .order_by(RefinedPost.date.asc())
+        .all()
+    )
+    return [row[0] for row in results if row[0] is not None]
