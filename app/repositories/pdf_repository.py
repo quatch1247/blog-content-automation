@@ -86,3 +86,10 @@ def truncate_split_posts(db: Session):
 def truncate_refined_posts(db: Session):
     db.execute(text("TRUNCATE TABLE refined_posts RESTART IDENTITY CASCADE;"))
     db.commit()
+
+
+def get_summary_markdown_by_post_id(db: Session, post_id: int) -> Optional[str]:
+    post = db.query(RefinedPost).filter(RefinedPost.id == post_id).first()
+    if not post or not post.summary:
+        return None
+    return post.summary

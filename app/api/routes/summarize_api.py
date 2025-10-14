@@ -1,17 +1,17 @@
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
-from app.services.thumbnail_service import ThumbnailService
+from app.services.summarize_service import SummaryService
 import io
 
-router = APIRouter(prefix="/thumbnails", tags=["thumbnails"])
+router = APIRouter(prefix="/summaries", tags=["summaries"])
 
 @router.get("/download/{post_id}")
-def download_thumbnail(post_id: int):
+def download_summary_pdf(post_id: int):
     try:
-        result = ThumbnailService.generate_thumbnail_info(post_id)
+        result = SummaryService.generate_summary_pdf(post_id)
         return StreamingResponse(
-            io.BytesIO(result["image_bytes"]),
-            media_type="image/png",
+            io.BytesIO(result["pdf_bytes"]),
+            media_type="application/pdf",
             headers={"Content-Disposition": f"attachment; filename={result['filename']}"}
         )
     except HTTPException:
