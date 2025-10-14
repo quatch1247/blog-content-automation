@@ -18,7 +18,10 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "local"
     PROJECT_NAME: str = "Blog Content Automation"
     cors_origins_raw: str = "*"
-    base_dir: str = str(Path(__file__).resolve().parent.parent.parent)
+    base_dir: str = str(Path(__file__).resolve().parent.parent)
+
+    STABILITY_API_KEY: str
+    OPENAI_API_KEY: str
 
     class Config:
         env_file = ".env"

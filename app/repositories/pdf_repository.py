@@ -62,3 +62,27 @@ def get_all_refined_posts(db: Session) -> List[RefinedPost]:
 
 def get_refined_post_count(db: Session) -> int:
     return db.query(RefinedPost).count()
+
+
+def get_refined_post_basic_by_id(db, post_id: int):
+    post = db.query(RefinedPost).filter(RefinedPost.id == post_id).first()
+    if not post:
+        return None
+    return {
+        "id": post.id,
+        "title": post.title,
+        "author": post.author,
+        "json_path": post.json_path
+    }
+
+
+def get_refined_post_basic_by_id(db, post_id: int):
+    post = db.query(RefinedPost).filter(RefinedPost.id == post_id).first()
+    if not post:
+        return None
+    return {
+        "id": post.id,
+        "title": post.title,
+        "author": post.author,
+        "json_path": post.json_path
+    }
