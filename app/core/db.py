@@ -28,7 +28,6 @@ SessionLocal = sessionmaker(
 
 Base = declarative_base()
 
-# FastAPI 의존성 주입용 DB 세션
 def get_db() -> Generator[Session, None, None]:
     db = SessionLocal()
     try:

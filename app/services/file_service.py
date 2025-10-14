@@ -1,7 +1,9 @@
+import os
 import json
 import logging
-import os
 import shutil
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from typing import List
 
 from fastapi import UploadFile
@@ -16,6 +18,7 @@ from app.utils.file_cleanup_utils import safe_remove
 from app.utils.pdf_refiner import batch_refine_split_posts
 from app.utils.pdf_splitter import split_pdf_by_ranges
 from app.utils.pdf_utils import convert_pdf_to_html, extract_page_map, detect_post_ranges
+from app.utils.summarization_utils import summarize
 
 
 logger = logging.getLogger(__name__)
@@ -31,7 +34,9 @@ os.makedirs(REFINED_POSTS_DIR, exist_ok=True)
 
 class FileService:
     @staticmethod
-    async def save_and_split_pdf(file: UploadFile) -> dict:
+    async def save_and_split_pdf(
+        file: UploadFile,
+    ) -> dict:
         # 파일 확장자 검증
         if not file.filename.lower().endswith(".pdf"):
             raise APIException(ErrorCode.INVALID_FILE_TYPE, details=[file.filename])
@@ -81,35 +86,39 @@ class FileService:
                 )
                 split_post_objs.append(split_post_obj)
 
-            # 분할된 PDF 후처리 (정제)
+            # 분할된 PDF 후처리 (정제함.)
             refined_results = batch_refine_split_posts(
                 split_dir=split_dir,
                 output_dir=refined_dir,
                 max_workers=2
             )
 
-            # RefinedPost DB 저장
-            for idx, refined in enumerate(refined_results.get("results", [])):
-                split_post_obj = split_post_objs[idx]
-
+            bodies = []
+            for refined in refined_results.get("results", []):
                 parsed_json_path = refined.get("parsed_json_path")
-                if isinstance(parsed_json_path, dict):
-                    parsed_json_path = parsed_json_path.get("path")
-
-                if not isinstance(parsed_json_path, str):
-                    raise APIException(
-                        ErrorCode.PDF_PROCESSING_FAILED,
-                        details=[f"Invalid parsed_json_path type: {type(parsed_json_path)}"]
-                    )
-
                 with open(parsed_json_path, "r", encoding="utf-8") as f:
                     meta = json.load(f)
+                    bodies.append(meta.get("body", ""))
 
+            loop = asyncio.get_event_loop()
+            with ThreadPoolExecutor(max_workers=4) as executor:
+                summaries = await asyncio.gather(
+                    *[loop.run_in_executor(executor, summarize, body) for body in bodies]
+                )
+
+            # RefinedPost DB 저장 (요약문 포함)
+            for idx, refined in enumerate(refined_results.get("results", [])):
+                split_post_obj = split_post_objs[idx]
+                parsed_json_path = refined.get("parsed_json_path")
+                with open(parsed_json_path, "r", encoding="utf-8") as f:
+                    meta = json.load(f)
                 parsed_date = None
                 try:
                     parsed_date = parse_datetime_flexible(meta.get("date")) if meta.get("date") else None
                 except Exception as e:
                     logger.warning(f"[WARN] 날짜 파싱 실패 ({meta.get('date')}): {e}")
+
+                summary = summaries[idx] if summaries and idx < len(summaries) else None
 
                 pdf_repository.create_refined_post(
                     db,
@@ -120,6 +129,7 @@ class FileService:
                     author=meta.get("author"),
                     date=parsed_date,
                     url=meta.get("url"),
+                    summary=summary,
                 )
 
         except Exception as e:

@@ -30,6 +30,7 @@ def create_refined_post(
     author: Optional[str],
     date: Optional[datetime],
     url: Optional[str],
+    summary: Optional[str] = None,
 ) -> RefinedPost:
     if date is not None and not isinstance(date, datetime):
         raise TypeError(f"Expected 'date' to be datetime or None, got {type(date)}")
@@ -41,12 +42,12 @@ def create_refined_post(
         author=author,
         date=date,
         url=url,
+        summary=summary,
     )
     db.add(obj)
     db.commit()
     db.refresh(obj)
     return obj
-
 
 def get_raw_pdf_count(db: Session) -> int:
     return db.query(RawPdf).count()

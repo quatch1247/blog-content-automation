@@ -30,7 +30,7 @@ class ThumbnailService:
             }
 
             prompt = load_prompt("thumbnail_prompt.j2", prompt_context)
-            print("프롬프트:", prompt)
+            # print("프롬프트:", prompt)
 
             client = OpenAI(api_key=settings.OPENAI_API_KEY)
             resp = client.images.generate(

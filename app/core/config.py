@@ -15,13 +15,15 @@ class Settings(BaseSettings):
     DB_POOL_TIMEOUT: int = 30
     DB_POOL_RECYCLE: int = 1800
 
-    ENVIRONMENT: str = "local"
+    ENVIRONMENT: str = "local" # local | dev | staging | production
     PROJECT_NAME: str = "Blog Content Automation"
     cors_origins_raw: str = "*"
     base_dir: str = str(Path(__file__).resolve().parent.parent)
 
-    STABILITY_API_KEY: str
+    STABILITY_API_KEY: str #성능 이슈로 사용x
     OPENAI_API_KEY: str
+    
+    GROQ_API_KEY: str
 
     class Config:
         env_file = ".env"
