@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from app.api.main import api_router
 from app.core.exception_handlers import api_exception_handler
 from app.core.exceptions import APIException
-from app.core.init_db import init_db  # ← 초기화 함수 import
+from app.core.init_db import init_db
 
 app = FastAPI(
     title="Blog Content Automation",

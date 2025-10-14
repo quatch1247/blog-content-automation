@@ -1,4 +1,3 @@
-import os
 from app.core.config import get_settings
 from app.utils.prompt_utils import load_prompt
 
