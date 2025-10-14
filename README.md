@@ -228,7 +228,7 @@ docker compose up -d --build
 
 ### 4. 썸네일 이미지 자동 생성
 <p>
-  <img src="./images/스크린샷 2025-10-14 오후 11.13.56.png" alt="썸네일 스크린샷 1" height="300">
+  <img src="./images/thumbnail_2025_10_14_23_13" alt="썸네일 스크린샷 1" height="300">
 </p>
 > 제목 및 본문을 기반으로 AI를 활용해 자동으로 생성된 썸네일입니다.
 
