@@ -32,4 +32,5 @@ class RefinedPost(Base):
     date = Column(DateTime)
     url = Column(String)
     summary = Column(Text)
+    brief_summary = Column(Text)
 

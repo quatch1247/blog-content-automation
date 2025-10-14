@@ -7,7 +7,7 @@ from groq import Groq
 
 settings = get_settings()
 
-def summarize(text: str, mode: str = "openai", model: str = None) -> str:
+def generate_markdown_summary(text: str, mode: str = "openai", model: str = None) -> str:
     prompt = load_prompt("summary_prompt.j2", {"body": text})
 
     if mode == "openai":
@@ -39,3 +39,17 @@ def summarize(text: str, mode: str = "openai", model: str = None) -> str:
         return chat_completion.choices[0].message.content.strip()
     else:
         raise ValueError(f"Unknown mode: {mode}")
+
+def generate_brief_summary(text: str, model: str = "gpt-4o-mini") -> str:
+    prompt = load_prompt("brief_summary_prompt.j2", {"body": text})
+    client = OpenAI(api_key=settings.OPENAI_API_KEY)
+    response = client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": "너는 콘텐츠 큐레이션 전문가야."},
+            {"role": "user", "content": prompt}
+        ],
+        max_tokens=512,
+        temperature=0.5,
+    )
+    return response.choices[0].message.content.strip()

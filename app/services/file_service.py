@@ -18,7 +18,7 @@ from app.utils.file_cleanup_utils import safe_remove
 from app.utils.pdf_refiner import batch_refine_split_posts
 from app.utils.pdf_splitter import split_pdf_by_ranges
 from app.utils.pdf_utils import convert_pdf_to_html, extract_page_map, detect_post_ranges
-from app.utils.summarization_utils import summarize
+from app.utils.summarization_utils import generate_markdown_summary, generate_brief_summary
 
 
 logger = logging.getLogger(__name__)
@@ -100,18 +100,29 @@ class FileService:
                     meta = json.load(f)
                     bodies.append(meta.get("body", ""))
 
+            # 병렬로 markdown summary + brief summary 생성
             loop = asyncio.get_event_loop()
             with ThreadPoolExecutor(max_workers=4) as executor:
-                summaries = await asyncio.gather(
-                    *[loop.run_in_executor(executor, summarize, body) for body in bodies]
+                markdown_tasks = [
+                    loop.run_in_executor(executor, generate_markdown_summary, body)
+                    for body in bodies
+                ]
+                brief_tasks = [
+                    loop.run_in_executor(executor, generate_brief_summary, body)
+                    for body in bodies
+                ]
+                summaries, brief_summaries = await asyncio.gather(
+                    asyncio.gather(*markdown_tasks),
+                    asyncio.gather(*brief_tasks),
                 )
-
-            # RefinedPost DB 저장 (요약문 포함)
+                
+            # RefinedPost DB 저장 (두 가지 요약문 함께 저장)
             for idx, refined in enumerate(refined_results.get("results", [])):
                 split_post_obj = split_post_objs[idx]
                 parsed_json_path = refined.get("parsed_json_path")
                 with open(parsed_json_path, "r", encoding="utf-8") as f:
                     meta = json.load(f)
+
                 parsed_date = None
                 try:
                     parsed_date = parse_datetime_flexible(meta.get("date")) if meta.get("date") else None
@@ -119,6 +130,7 @@ class FileService:
                     logger.warning(f"[WARN] 날짜 파싱 실패 ({meta.get('date')}): {e}")
 
                 summary = summaries[idx] if summaries and idx < len(summaries) else None
+                brief_summary = brief_summaries[idx] if brief_summaries and idx < len(brief_summaries) else None
 
                 pdf_repository.create_refined_post(
                     db,
@@ -130,6 +142,7 @@ class FileService:
                     date=parsed_date,
                     url=meta.get("url"),
                     summary=summary,
+                    brief_summary=brief_summary,
                 )
 
         except Exception as e:

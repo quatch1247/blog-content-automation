@@ -31,9 +31,11 @@ def create_refined_post(
     date: Optional[datetime],
     url: Optional[str],
     summary: Optional[str] = None,
+    brief_summary: Optional[str] = None,
 ) -> RefinedPost:
     if date is not None and not isinstance(date, datetime):
         raise TypeError(f"Expected 'date' to be datetime or None, got {type(date)}")
+    
     obj = RefinedPost(
         split_post_id=split_post_id,
         json_path=json_path,
@@ -43,6 +45,7 @@ def create_refined_post(
         date=date,
         url=url,
         summary=summary,
+        brief_summary=brief_summary,
     )
     db.add(obj)
     db.commit()
