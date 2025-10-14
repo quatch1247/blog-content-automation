@@ -4,7 +4,7 @@ from openai import OpenAI
 
 settings = get_settings()
 
-def generate_weekly_insight_report_markdown(
+def generate_period_insight_report_markdown(
     brief_summaries: list,
     start_date,
     end_date,
@@ -15,7 +15,7 @@ def generate_weekly_insight_report_markdown(
         "end_date": end_date,
         "summaries": brief_summaries,
     }
-    prompt = load_prompt("weekly_report_prompt.j2", prompt_context)
+    prompt = load_prompt("period_report_prompt.j2", prompt_context)
     print(prompt)
     client = OpenAI(api_key=settings.OPENAI_API_KEY)
     response = client.chat.completions.create(

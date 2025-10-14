@@ -5,20 +5,20 @@ from contextlib import closing
 
 from app.core.db import get_db_session
 from app.repositories import pdf_repository
-from app.utils.weekly_report_utils import generate_weekly_insight_report_markdown
+from app.utils.period_report_utils import generate_period_insight_report_markdown
 from app.core.exceptions import APIException
 from app.core.error_codes import ErrorCode
 
 
-class WeeklyReportService:
+class PeriodReportService:
     @staticmethod
-    def generate_weekly_report(start_date, end_date) -> dict:
+    def generate_period_report(start_date, end_date) -> dict:
         with closing(get_db_session()) as db:
             brief_summaries = pdf_repository.get_brief_summaries_by_date_range(db, start_date, end_date)
             if not brief_summaries:
                 raise APIException(ErrorCode.FILE_NOT_FOUND, details=[f"summary range: {start_date} ~ {end_date}"])
 
-        md_text = generate_weekly_insight_report_markdown(
+        md_text = generate_period_insight_report_markdown(
             brief_summaries=brief_summaries,
             start_date=start_date,
             end_date=end_date,
@@ -166,7 +166,7 @@ class WeeklyReportService:
             raise APIException(ErrorCode.FILE_SAVE_FAILED, details=[f"PDF 생성 오류: {str(e)}"])
 
 
-        filename = f"weekly_report_{start_date}_{end_date}.pdf"
+        filename = f"period_report_{start_date}_{end_date}.pdf"
         return {
             "pdf_bytes": pdf_bytes,
             "filename": filename,
