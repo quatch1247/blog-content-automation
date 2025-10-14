@@ -1,6 +1,8 @@
 import os
 import json
 import logging
+import tempfile
+import zipfile
 from typing import List
 from fastapi import UploadFile
 
@@ -142,7 +144,9 @@ class FileService:
             "refined_results": refined_results,
             "refined_folder": refined_dir,
         }
-
+        
+        
+    @staticmethod
     def list_files():
         db = get_db_session()
         try:
