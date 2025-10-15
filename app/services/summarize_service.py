@@ -1,6 +1,7 @@
 import markdown
 from weasyprint import HTML
 from contextlib import closing
+
 from app.repositories import pdf_repository
 from app.core.db import get_db_session
 from app.core.exceptions import APIException
@@ -12,11 +13,22 @@ class SummaryService:
     def generate_summary_pdf(post_id: int) -> dict:
         with closing(get_db_session()) as db:
             md_text = pdf_repository.get_summary_markdown_by_post_id(db, post_id)
+            print("####",md_text)
+
         if not md_text:
             raise APIException(ErrorCode.FILE_NOT_FOUND, details=[f"post_id: {post_id}"])
 
+        md_text = SummaryService._clean_table_newlines(md_text)
 
-        html_body = markdown.markdown(md_text)
+        html_body = markdown.markdown(
+            md_text,
+            extensions=['tables', 'fenced_code'],
+            extension_configs={
+                'tables': {},
+                'fenced_code': {},
+            }
+        )
+
         html = f"""
         <html>
         <head>
@@ -57,10 +69,6 @@ class SummaryService:
                     padding-bottom: 6px;
                     font-weight: 700;
                 }}
-                h3, h4 {{
-                    color: #198f34;
-                    margin-top: 20px;
-                }}
                 p {{
                     font-size: 1.05em;
                     line-height: 1.85;
@@ -68,30 +76,11 @@ class SummaryService:
                     color: #242a23;
                 }}
                 ul, ol {{
-                    font-size: 1em;
                     margin: 8px 0 14px 22px;
                     padding-left: 1.2em;
                 }}
                 li {{
                     margin-bottom: 7px;
-                }}
-                .notice {{
-                    background: #f0fff0;
-                    color: #2a592e;
-                    border-left: 5px solid #9ffca5;
-                    border-radius: 8px;
-                    padding: 12px 18px 12px 18px;
-                    margin: 18px 0 18px 0;
-                    font-size: 1.02em;
-                }}
-                .deadline {{
-                    background: #e7ffe7;
-                    border-left: 5px solid #8eea8f;
-                    padding: 10px 18px;
-                    margin: 20px 0;
-                    border-radius: 8px;
-                    font-weight: 500;
-                    color: #28702d;
                 }}
                 code, pre {{
                     background: #f8fbf8;
@@ -104,22 +93,25 @@ class SummaryService:
                     border-collapse: collapse;
                     margin: 18px 0;
                     width: 100%;
+                    table-layout: fixed;
+                    word-break: break-word;
                 }}
                 th, td {{
                     border: 1px solid #e2f5e7;
                     padding: 8px 14px;
                     font-size: 1em;
+                    word-break: break-word;
+                    white-space: pre-wrap;
                 }}
                 th {{
                     background: #e8ffed;
                     color: #178a30;
                 }}
-                /* Extra touch for blockquote */
                 blockquote {{
                     border-left: 4px solid #88eb8f;
                     background: #f7fff7;
                     color: #28823c;
-                    margin: 20px 0 20px 0;
+                    margin: 20px 0;
                     padding: 12px 18px;
                     font-style: italic;
                     border-radius: 7px;
@@ -139,8 +131,46 @@ class SummaryService:
         except Exception as e:
             raise APIException(ErrorCode.FILE_SAVE_FAILED, details=[f"PDF 생성 중 오류: {str(e)}"])
 
-        filename = f"summary_{post_id}.pdf"
         return {
             "pdf_bytes": pdf_bytes,
-            "filename": filename,
+            "filename": f"summary_{post_id}.pdf",
         }
+
+    @staticmethod
+    def _clean_table_newlines(md_text: str) -> str:
+        lines = md_text.splitlines()
+
+        def is_table_line(s: str) -> bool:
+            s = s.rstrip()
+            return s.startswith("|") and s.endswith("|") and ("|" in s[1:-1])
+
+        cleaned = []
+        i = 0
+        while i < len(lines):
+            raw = lines[i]
+            s = raw.lstrip()
+            if is_table_line(s):
+                if cleaned and cleaned[-1].strip() != "":
+                    cleaned.append("")
+
+                table_block = []
+                while i < len(lines):
+                    cur = lines[i].lstrip()
+                    if is_table_line(cur):
+                        table_block.append(cur.rstrip())
+                        i += 1
+                    else:
+                        break
+
+                cleaned.extend(table_block)
+
+                cleaned.append("")
+                continue
+
+            else:
+                cleaned.append(raw)
+                i += 1
+
+        # 뒤쪽 여분 개행 정리
+        out = "\n".join(cleaned).strip() + "\n"
+        return out
