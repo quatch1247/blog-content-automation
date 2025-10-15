@@ -39,7 +39,7 @@ class ThumbnailService:
                     prompt=prompt,
                     n=1,
                     size="1024x1024",
-                    quality="high",
+                    quality="low",
                     output_format="png",
                 )
                 if not resp or not resp.data or len(resp.data) == 0:
