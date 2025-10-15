@@ -125,8 +125,5 @@ Desktop.ini
 dmypy.json
 .pyre/
 
-# Poetry
-poetry.lock
-
 # Local file storage (uploads)
 uploads/
